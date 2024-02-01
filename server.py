@@ -1,22 +1,45 @@
 #!/usr/bin/env python3
 
 import socket
+import datetime
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
 # Define the IP and port for the server
 IP = '127.0.0.1'
 PORT = 5000
+KEY = b'Sixteen byte key'
+IV = b'InitializationVe'
 
 def encryption(message):
-    pass
+    cipher = Cipher(algorithms.AES(KEY), modes.CFB(IV), backend=default_backend())
+    encryptor = cipher.encryptor()
+    return encryptor.update(message.encode('utf-8')) + encryptor.finalize()
 
+def decryption(ciphertext):
+    cipher = Cipher(algorithms.AES(KEY), modes.CFB(IV), backend=default_backend())
+    decryptor = cipher.decryptor()
+    return decryptor.update(ciphertext) + decryptor.finalize()
+
+def log_to_file(data, direction):
+    timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    log_entry = f"[{timestamp}] {direction}: {data}\n"
+
+    with open('encryption_log_server.txt', 'a') as log_file:
+        log_file.write(log_entry)
 
 def chat(client_socket):
     while True:
-        # Receive data from the client
-        data = client_socket.recv(1024).decode('utf-8')
-        if not data:
-            pass
+        # Receive encrypted data from the client
+        encrypted_data = client_socket.recv(1024)
+        if not encrypted_data:
+            break
 
+        # Log received encrypted data
+        log_to_file(encrypted_data.hex(), "Received")
+
+        # Decrypt the received data
+        data = decryption(encrypted_data).decode('utf-8')
         print(f"Received from client: {data}")
 
         # Check for the exit command
@@ -24,13 +47,17 @@ def chat(client_socket):
             print("Client requested to quit. Exiting.")
             break
 
-
-        # Send a response back to the client
+        # Get user input and encrypt the message
         response = input("Enter your response: ")
-        if not message:
-            message = ' '   
-        client_socket.send(response.encode('utf-8'))
+        if not response:
+            response = ' '
+        encrypted_response = encryption(response)
         
+        # Log sent encrypted data
+        log_to_file(encrypted_response.hex(), "Sent")
+
+        client_socket.send(encrypted_response)
+
         # Check for the exit command
         if response.lower() == '\\quit':
             print("Exiting.")
@@ -50,8 +77,6 @@ def start_server():
     # Accept a connection from a client
     client_socket, addr = server_socket.accept()
     print(f"Accepted connection from {addr}")
-
-    
 
     # Start the chat
     chat(client_socket)
