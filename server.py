@@ -6,6 +6,35 @@ import socket
 IP = '127.0.0.1'
 PORT = 5000
 
+def encryption(message):
+    pass
+
+
+def chat(client_socket):
+    while True:
+        # Receive data from the client
+        data = client_socket.recv(1024).decode('utf-8')
+        if not data:
+            pass
+
+        print(f"Received from client: {data}")
+
+        # Check for the exit command
+        if data.lower() == '\\quit':
+            print("Client requested to quit. Exiting.")
+            break
+
+
+        # Send a response back to the client
+        response = input("Enter your response: ")
+        if not message:
+            message = ' '   
+        client_socket.send(response.encode('utf-8'))
+        
+        # Check for the exit command
+        if response.lower() == '\\quit':
+            print("Exiting.")
+            break
 
 def start_server():
     # Create a socket object
@@ -22,22 +51,10 @@ def start_server():
     client_socket, addr = server_socket.accept()
     print(f"Accepted connection from {addr}")
 
-    while True:
-        # Receive data from the client
-        data = client_socket.recv(1024).decode('utf-8')
-        if not data:
-            break
+    
 
-        print(f"Received from client: {data}")
-
-        # Check for the exit command
-        if data.lower() == '\\quit':
-            print("Client requested to quit. Exiting.")
-            break
-
-        # Send a response back to the client
-        response = input("Enter your response: ")
-        client_socket.send(response.encode('utf-8'))
+    # Start the chat
+    chat(client_socket)
 
     # Close the client socket and server socket when the loop breaks
     client_socket.close()
