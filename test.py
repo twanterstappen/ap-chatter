@@ -1,29 +1,60 @@
-from cryptography.hazmat.primitives.asymmetric import dh
-from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives import serialization
-import socket
 
-def generate_key_pair():
-    parameters = dh.generate_parameters(generator=2, key_size=512, backend=default_backend())
-    private_key = parameters.generate_private_key()
-    public_key = private_key.public_key()
-    return private_key, public_key
+import sympy
+import secrets
 
-def exchange_public_key(client_socket, server_private_key):
-    client_public_key_bytes = client_socket.recv(4096)
-    client_public_key = serialization.load_pem_public_key(client_public_key_bytes, backend=default_backend())
-    shared_key = server_private_key.exchange(client_public_key)
-    return shared_key
+def is_primitive_root(g, p):
+    # Check if g is a primitive root modulo p
+    return sympy.is_primitive_root(g, p)
+
+def is_prime(n):
+    return sympy.isprime(n)
+
+def generate_large_prime(bits):
+    while True:
+        candidate = secrets.randbits(bits)
+        if is_prime(candidate):
+            return candidate
+        
+def generate_diffie_hellman_key(p, g, private_key):
+    public_key = (g ** private_key) % p
+    return public_key
+
+def calculate_shared_secret(public_key, private_key, p):
+    shared_secret = (public_key ** private_key) % p
+    return shared_secret
 
 
-def print_dh_private_key(private_key, key_type):
-    private_numbers = private_key.private_numbers()
-    print(f"{key_type} Key:")
-    print("----------")
-    print(f"Private Value: {private_numbers.x}")
-    print(f"Public Value: {private_numbers.public_numbers.y}")
+def generate_generator(p):
+    # Find a primitive root modulo p
+    for g in range(2, p):
+        if is_primitive_root(g, p):
+            return g
 
-private_key, public_key = generate_key_pair()
+# Select a bit length for the prime number (adjust as needed)
+prime_bits = 128
 
-# Print private key
-print_dh_private_key(private_key, "Private")
+# Find a large prime number for p
+p = generate_large_prime(prime_bits)
+
+# Choose a random generator g
+g = generate_generator(p)
+
+# Rest of your code remains the same...
+# Example usage:
+# Generating private keys for Alice and Bob
+private_key_Alice = 15
+private_key_Bob = 15
+
+# Computing public keys for Alice and Bob
+public_key_Alice = generate_diffie_hellman_key(p, g, private_key_Alice)
+public_key_Bob = generate_diffie_hellman_key(p, g, private_key_Bob)
+print(public_key_Alice)
+print(public_key_Bob)
+# Exchanging public keys over an insecure channel
+# In a real-world scenario, this would be done securely (e.g., through a secure communication channel)
+shared_secret_Alice = calculate_shared_secret(public_key_Bob, private_key_Alice, p)
+shared_secret_Bob = calculate_shared_secret(public_key_Alice, private_key_Bob, p)
+
+# Both parties now have the same shared secret
+print("Shared Secret (Alice):", shared_secret_Alice)
+print("Shared Secret (Bob):", shared_secret_Bob)

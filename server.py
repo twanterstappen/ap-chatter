@@ -9,25 +9,34 @@ from cryptography.hazmat.primitives.asymmetric import dh
 from cryptography.hazmat.primitives import serialization
 import json
 import time
+import sympy
+import secrets
 
 # Define the IP and port for the server
 IP = '127.0.0.1'
 PORT = 5000
-PRIVATE_KEY = 'b'
-PUBLIC_KEY = 'a'
-KEY = b'Sixteen byte key'
+PRIME_BITS = 128
+PRIVATE_KEY_SERVER = secrets.randbits(16)
+SHARED_SECRET = b'Sixteen byte key'
+
+      
+def generate_diffie_hellman_key(p, g, private_key):
+    public_key = (g ** private_key) % p
+    return public_key
 
 
-
+def calculate_shared_secret(public_key_client, private_key_server, p):
+    shared_secret = (public_key_client ** private_key_server) % p
+    return shared_secret
 
 def encryption(message, iv):
-    cipher = Cipher(algorithms.AES(KEY), modes.CFB(iv), backend=default_backend())
+    cipher = Cipher(algorithms.AES(SHARED_SECRET), modes.CFB(iv), backend=default_backend())
     encryptor = cipher.encryptor()
     return iv + encryptor.update(message.encode('utf-8')) + encryptor.finalize()
 
 def decryption(ciphertext):
     iv = ciphertext[:16]  # Extract the IV (first 16 bytes)
-    cipher = Cipher(algorithms.AES(KEY), modes.CFB(iv), backend=default_backend())
+    cipher = Cipher(algorithms.AES(SHARED_SECRET), modes.CFB(iv), backend=default_backend())
     decryptor = cipher.decryptor()
     return decryptor.update(ciphertext[16:]) + decryptor.finalize()
 
@@ -49,17 +58,26 @@ def handshake(client_socket):
     
     if message_recv['header']['MessageType'] == 'ClientHello':
         print("received server ClientHello")
-        if message_recv['content']['public_key']:
-            client_public_key = message_recv['content']['public_key']
-            print("received client key")
+        if message_recv['content']['public_key'] and message_recv['content']['P'] and message_recv['content']['G']:
+            public_key_client =  message_recv['content']['public_key']
+            p = message_recv['content']['P']
+            g = message_recv['content']['G']
+            print("received client key, P and G.")
         else:
-            print("Handshake failed, no client public key. Closing connection.")
+            print("Handshake failed, no client public key OR P or G. Closing connection.")
             return False
         
     else:
         print("Handshake failed, no ClientHello. Closing connection.")
         return False
         
+    
+    print('calculating public key and shared secret')
+    public_key_server = generate_diffie_hellman_key(p, g, PRIVATE_KEY_SERVER)
+    SHARED_SECRET = calculate_shared_secret(public_key_client, PRIVATE_KEY_SERVER, p)
+    print(SHARED_SECRET)
+    
+    
     # Server ACK message sent
     #------------------------------------------------------------------------------
     header = {'MessageType': 'Ack'}
@@ -81,7 +99,9 @@ def handshake(client_socket):
     # ServerHello message sent
     #------------------------------------------------------------------------------
     header = {'MessageType': 'ServerHello'}
-    content = {'public_key': PUBLIC_KEY}
+    
+    
+    content = {'public_key': public_key_server}
     
     # Combine header and content
     message = {'header': header, 'content': content}
@@ -105,8 +125,8 @@ def handshake(client_socket):
     else:
         print("Handshake failed, no client ack. Closing connection.")
         return False
-
     return True
+
 
 def chat(client_socket):
     while True:

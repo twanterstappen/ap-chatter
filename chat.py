@@ -8,23 +8,65 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.asymmetric import dh
 from cryptography.hazmat.primitives import serialization
 import json
+import sympy
+import secrets
 
-# Define the IP and port for the server
 IP = '127.0.0.1'
 PORT = 5000
-PRIVATE_KEY = 'a'
-PUBLIC_KEY = 'b'
-KEY = b'Sixteen byte key'
+PRIME_BITS = 128
+PRIVATE_KEY_CLIENT = secrets.randbits(16)
+SHARED_SECRET = b'Sixteen byte key'
+
+
+def is_primitive_root(g, p):
+    # Check if g is a primitive root modulo p
+    return sympy.is_primitive_root(g, p)
+
+def is_prime(n):
+    return sympy.isprime(n)
+
+def generate_large_prime(bits):
+    while True:
+        candidate = secrets.randbits(bits)
+        if is_prime(candidate):
+            return candidate
+        
+def generate_diffie_hellman_key(p, g, private_key):
+    public_key = (g ** private_key) % p
+    return public_key
+
+
+def generate_generator(p):
+    # Find a primitive root modulo p
+    for g in range(2, p):
+        if is_primitive_root(g, p):
+            return g
+
+def generate_DH_key(private_key_client):
+    p = generate_large_prime(PRIME_BITS)
+
+    # Choose a random generator g
+    g = generate_generator(p)
+
+    # Computing public keys for Alice and Bob
+    public_key_client = generate_diffie_hellman_key(p, g, private_key_client)
+    return public_key_client, p, g
+
+
+def calculate_shared_secret(public_key_client, private_key_server, p):
+    shared_secret = (public_key_client ** private_key_server) % p
+    return shared_secret
+
 
 
 def encryption(message, iv):
-    cipher = Cipher(algorithms.AES(KEY), modes.CFB(iv), backend=default_backend())
+    cipher = Cipher(algorithms.AES(SHARED_SECRET), modes.CFB(iv), backend=default_backend())
     encryptor = cipher.encryptor()
     return iv + encryptor.update(message.encode('utf-8')) + encryptor.finalize()
 
 def decryption(ciphertext):
     iv = ciphertext[:16]  # Extract the IV (first 16 bytes)
-    cipher = Cipher(algorithms.AES(KEY), modes.CFB(iv), backend=default_backend())
+    cipher = Cipher(algorithms.AES(SHARED_SECRET), modes.CFB(iv), backend=default_backend())
     decryptor = cipher.decryptor()
     return decryptor.update(ciphertext[16:]) + decryptor.finalize()
 
@@ -33,7 +75,10 @@ def handshake(client_socket):
     #------------------------------------------------------------------------------#
     # Send the "hello" message to the server
     header = {'MessageType': 'ClientHello'}
-    content = {'public_key': PUBLIC_KEY}
+    
+    public_key_server, p, g = generate_DH_key(PRIVATE_KEY_CLIENT)
+    
+    content = {'public_key': public_key_server,'P': p, 'G': g}
     
     # Combine header and content
     message = {'header': header, 'content': content}
@@ -67,7 +112,7 @@ def handshake(client_socket):
     if message_recv['header']['MessageType'] == 'ServerHello':
         print("received server ServerHello")
         if message_recv['content']['public_key']:
-            server_public_key = message_recv['content']['public_key']
+            public_key_server = message_recv['content']['public_key']
             print("received server key")
         else:
             print("Handshake failed, no server public key. Closing connection.")
@@ -77,7 +122,9 @@ def handshake(client_socket):
         print("Handshake failed, no ServerHello. Closing connection.")
         return False
 
-
+    # Calculate shared secret
+    SHARED_SECRET = calculate_shared_secret(public_key_server, PRIVATE_KEY_CLIENT, p)
+    print(SHARED_SECRET)
     # Client Ack sent
     #------------------------------------------------------------------------------
     header = {'MessageType': 'Ack'}
@@ -107,6 +154,26 @@ def log_to_file(data, direction):
 
 def chat(client_socket):
     while True:
+        # Generate a new IV for the next message
+        new_iv = os.urandom(16)
+
+        # Get user input and encrypt the message
+        response = input("Enter your response: ")
+        if not response:
+            response = ' '
+        encrypted_response = encryption(response, new_iv)
+        
+        # Log sent encrypted data
+        log_to_file(encrypted_response.hex(), "Sent")
+
+        client_socket.send(encrypted_response)
+
+        # Check for the exit command
+        if response.lower() == '\\quit':
+            print("Exiting.")
+            break
+        
+        
         # Receive encrypted data from the server
         encrypted_data = client_socket.recv(2048)
         if not encrypted_data:
