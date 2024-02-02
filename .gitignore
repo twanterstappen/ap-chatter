@@ -160,3 +160,6 @@ cython_debug/
 #.idea/
 
 encryption_log_server.txt
+encryption_log.txt
+.vscode/
+
