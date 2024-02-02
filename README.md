@@ -13,10 +13,12 @@ pip install -r requirements.txt
 ```
 
 # Usage
+To use the chat app, you need to start the server. The server will open a port where the client can connect to. After that the client script can be run. When the client connects to the server it will automaticly start a handshake and setup a secure connection. 
 
+**!Note** that the script need to run in 2 seperate terminals, where the server.py needs to run first.
 
 ## Server
-The server script listens for incoming connections. Once a connection is made with a client it will initialise a handshake. The client will calculate the initial P, G and IV for the diffie helman key exchange and AES encryption. 
+The server script listens for incoming connections. Once a connection is made with a client it will initialise a handshake. The client will calculate the initial P, G and IV for the Diffie Helman key exchange and AES encryption. 
 The server will by default run on 127.0.0.1:5000.
 
 *For starting the server*
@@ -27,7 +29,7 @@ python3 ./server.py
 
 
 ## Chat
-The Client script tries to connect to the server. Once connected it will initialise a handhsake. The client will calculate the initial P, G and IV for the Diffie Kelman key exchange and AES encryption. 
+The Client script tries to connect to the server. Once connected it will initialise a handhsake. The client will calculate the initial P, G and IV for the Diffie Helman key exchange and AES encryption. 
 The client will by default connect to 127.0.0.1:5000.
 
 *For starting the client*
@@ -42,3 +44,4 @@ python3 ./client.py
 - Large Prime Bits for security
 - Connection between server and client
 - Connection handshake for initialsing encryption
+- Logging what the server received and sent
