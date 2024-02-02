@@ -11,11 +11,20 @@ import json
 import sympy
 import secrets
 
+# Colors
+RESET = "\033[0m"
+RED = "\033[91m"
+GREEN = "\033[92m"
+YELLOW = "\033[93m"
+BLUE = "\033[94m"
+BLINK = "\033[5m"
+
+
 IP = '127.0.0.1'
 PORT = 5000
 PRIME_BITS = 128
 PRIVATE_KEY_CLIENT = secrets.randbits(16)
-SHARED_SECRET = b'Sixteen byte key'
+SHARED_SECRET = None
 
 
 def is_primitive_root(g, p):
@@ -59,14 +68,14 @@ def calculate_shared_secret(public_key_client, private_key_server, p):
 
 
 
-def encryption(message, iv):
-    cipher = Cipher(algorithms.AES(SHARED_SECRET), modes.CFB(iv), backend=default_backend())
+def encryption(message, iv, shared_secret):
+    cipher = Cipher(algorithms.AES(shared_secret), modes.CFB(iv), backend=default_backend())
     encryptor = cipher.encryptor()
     return iv + encryptor.update(message.encode('utf-8')) + encryptor.finalize()
 
-def decryption(ciphertext):
+def decryption(ciphertext, shared_secret):
     iv = ciphertext[:16]  # Extract the IV (first 16 bytes)
-    cipher = Cipher(algorithms.AES(SHARED_SECRET), modes.CFB(iv), backend=default_backend())
+    cipher = Cipher(algorithms.AES(shared_secret), modes.CFB(iv), backend=default_backend())
     decryptor = cipher.decryptor()
     return decryptor.update(ciphertext[16:]) + decryptor.finalize()
 
@@ -76,6 +85,7 @@ def handshake(client_socket):
     # Send the "hello" message to the server
     header = {'MessageType': 'ClientHello'}
     
+    print('Calculating public key')
     public_key_server, p, g = generate_DH_key(PRIVATE_KEY_CLIENT)
     
     content = {'public_key': public_key_server,'P': p, 'G': g}
@@ -123,8 +133,9 @@ def handshake(client_socket):
         return False
 
     # Calculate shared secret
-    SHARED_SECRET = calculate_shared_secret(public_key_server, PRIVATE_KEY_CLIENT, p)
-    print(SHARED_SECRET)
+    print('Calculating shared secret')
+    shared_secret = calculate_shared_secret(public_key_server, PRIVATE_KEY_CLIENT, p)
+    
     # Client Ack sent
     #------------------------------------------------------------------------------
     header = {'MessageType': 'Ack'}
@@ -140,7 +151,7 @@ def handshake(client_socket):
     client_socket.send(json_message)
     print("sent client Acknowledgment")
     
-    return True
+    return shared_secret
 #
 
 
@@ -152,7 +163,8 @@ def log_to_file(data, direction):
     with open('encryption_log.txt', 'a') as log_file:
         log_file.write(log_entry)
 
-def chat(client_socket):
+def chat(client_socket, shared_secret):
+    shared_secret = shared_secret.to_bytes(16, 'big')
     while True:
         # Generate a new IV for the next message
         new_iv = os.urandom(16)
@@ -161,7 +173,7 @@ def chat(client_socket):
         response = input("Enter your response: ")
         if not response:
             response = ' '
-        encrypted_response = encryption(response, new_iv)
+        encrypted_response = encryption(response, new_iv, shared_secret)
         
         # Log sent encrypted data
         log_to_file(encrypted_response.hex(), "Sent")
@@ -183,35 +195,17 @@ def chat(client_socket):
         log_to_file(encrypted_data.hex(), "Received")
 
         # Decrypt the received data
-        data = decryption(encrypted_data).decode('utf-8')
+        data = decryption(encrypted_data, shared_secret).decode('utf-8')
         print(f"Received from server: {data}")
 
         # Check for the exit command
         if data.lower() == '\\quit':
             print("Server requested to quit. Exiting.")
             break
-
-        # Generate a new IV for the next message
-        new_iv = os.urandom(16)
-
-        # Get user input and encrypt the message
-        message = input("Enter your message: ")
-        if not message:
-            message = ' '
-        encrypted_message = encryption(message, new_iv)
-
-        # Check for the exit command
-        if message.lower() == '\\quit':
-            print("Exiting.")
-            break
-
-        # Log sent encrypted data
-        log_to_file(encrypted_message.hex(), "Sent")
-        client_socket.send(encrypted_message)
         
         
 
-def start_client():
+def main():
     # Create a socket object
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
@@ -220,12 +214,16 @@ def start_client():
     print("Connected to server")
 
     # Start the handshake
-    if handshake(client_socket):
+    print(YELLOW +"\n-----[+]             Starting the handshake...          [+]-----\n" + RESET)
+    shared_secret = handshake(client_socket)
+    if shared_secret:
+        print(GREEN + "\n-----[+] Handshake Completed, You can start chatting... [+]-----\n" + RESET)
         # Start the chat if the handshake is successful
-        chat(client_socket)
+        chat(client_socket, shared_secret)
+
 
     # Close the client socket when the loop breaks
     client_socket.close()
 
 if __name__ == "__main__":
-    start_client()
+    main()
