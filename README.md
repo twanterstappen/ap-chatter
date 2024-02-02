@@ -23,7 +23,7 @@ The server will by default run on 127.0.0.1:5000.
 ```bash
 python3 ./server.py
 ```
-![Server terminal chat](image-1.png)
+![Server terminal chat](images/image-1.png)
 
 
 ## Chat
@@ -34,7 +34,7 @@ The client will by default connect to 127.0.0.1:5000.
 ```bash
 python3 ./client.py
 ```
-![Client terminal chat](image-2.png)
+![Client terminal chat](images/image-2.png)
 
 # Functions
 - AES Encryption with CBF mode
