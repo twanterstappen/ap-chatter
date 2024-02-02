@@ -45,6 +45,7 @@ def handshake(client_socket):
     # Receive the "hello" message from the server
     json_message_recv = client_socket.recv(2048).decode('utf-8')
     message_recv = json.loads(json_message_recv)
+    log_to_file(message_recv, "Received")
     
     if message_recv['header']['MessageType'] == 'ClientHello':
         print("received server ClientHello")
@@ -72,6 +73,7 @@ def handshake(client_socket):
     
     # Send the encoded JSON message
     client_socket.send(json_message)
+    log_to_file(message, "Sent")
     print("sent server Acknowledgment")
     # Sleep for 0.5 second for the client to receive and process the ACK
     time.sleep(0.5)
@@ -89,12 +91,14 @@ def handshake(client_socket):
     
     # Send the encoded JSON message
     client_socket.send(json_message)
+    log_to_file(message, "Sent")
     print("sent server ServerHello")
 
     # Client Ack sent
     #------------------------------------------------------------------------------
     json_message_recv = client_socket.recv(2048).decode('utf-8')
     message_recv = json.loads(json_message_recv)
+    log_to_file(message_recv, "Received")
     
     if message_recv['header']['MessageType'] == 'Ack':
         print("received client Acknowledgment")
