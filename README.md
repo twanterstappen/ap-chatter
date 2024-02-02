@@ -43,5 +43,5 @@ python3 ./client.py
 - Diffie Hellman Key exchange
 - Large Prime Bits for security
 - Connection between server and client
-- Connection handshake for initialsing encryption
+- Connection handshake for initialising encryption
 - Logging what the server received and sent
