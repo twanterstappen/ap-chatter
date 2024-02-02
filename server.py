@@ -9,7 +9,6 @@ from cryptography.hazmat.primitives.asymmetric import dh
 from cryptography.hazmat.primitives import serialization
 import json
 import time
-import sympy
 import secrets
 
 # Colors
@@ -25,6 +24,7 @@ BLINK = "\033[5m"
 IP = '127.0.0.1'
 PORT = 5000
 PRIME_BITS = 128
+# Can be increased for more security, but it will slow down the handshake
 PRIVATE_KEY_SERVER = secrets.randbits(16)
 
 
@@ -81,7 +81,7 @@ def handshake(client_socket):
         return False
         
     
-    print('Calculating public key and shared secret')
+    print(BLINK + 'Calculating public key and shared secret' + RESET)
     public_key_server = generate_diffie_hellman_key(p, g, PRIVATE_KEY_SERVER)
     shared_secret = calculate_shared_secret(public_key_client, PRIVATE_KEY_SERVER, p)
     
@@ -150,7 +150,7 @@ def chat(client_socket, shared_secret):
 
         # Decrypt the received data
         data = decryption(encrypted_data, shared_secret).decode('utf-8')
-        print(f"Received from client: {data}")
+        print(BLUE + "Server: " + RESET + data)
 
         # Check for the exit command
         if data.lower() == '\\quit':
@@ -161,7 +161,7 @@ def chat(client_socket, shared_secret):
         new_iv = os.urandom(16)
 
         # Get user input and encrypt the message
-        response = input("Enter your response: ")
+        response = input(GREEN + "You: " + RESET)
         if not response:
             response = ' '
         encrypted_response = encryption(response, new_iv, shared_secret)

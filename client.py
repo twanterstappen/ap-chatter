@@ -23,8 +23,9 @@ BLINK = "\033[5m"
 IP = '127.0.0.1'
 PORT = 5000
 PRIME_BITS = 128
+# Can be increased for more security, but it will slow down the handshake
 PRIVATE_KEY_CLIENT = secrets.randbits(16)
-SHARED_SECRET = None
+
 
 
 def is_primitive_root(g, p):
@@ -85,7 +86,7 @@ def handshake(client_socket):
     # Send the "hello" message to the server
     header = {'MessageType': 'ClientHello'}
     
-    print('Calculating public key')
+    print(BLINK + 'Calculating public key' + RESET)
     public_key_server, p, g = generate_DH_key(PRIVATE_KEY_CLIENT)
     
     content = {'public_key': public_key_server,'P': p, 'G': g}
@@ -133,7 +134,7 @@ def handshake(client_socket):
         return False
 
     # Calculate shared secret
-    print('Calculating shared secret')
+    print(BLINK + 'Calculating shared secret' + RESET)
     shared_secret = calculate_shared_secret(public_key_server, PRIVATE_KEY_CLIENT, p)
     
     # Client Ack sent
@@ -170,7 +171,7 @@ def chat(client_socket, shared_secret):
         new_iv = os.urandom(16)
 
         # Get user input and encrypt the message
-        response = input("Enter your response: ")
+        response = input(GREEN + "You: " + RESET)
         if not response:
             response = ' '
         encrypted_response = encryption(response, new_iv, shared_secret)
@@ -196,7 +197,7 @@ def chat(client_socket, shared_secret):
 
         # Decrypt the received data
         data = decryption(encrypted_data, shared_secret).decode('utf-8')
-        print(f"Received from server: {data}")
+        print(BLUE + "Server: " + RESET + data)
 
         # Check for the exit command
         if data.lower() == '\\quit':
