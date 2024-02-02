@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import socket
+import os
 import datetime
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
@@ -9,23 +10,23 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 IP = '127.0.0.1'
 PORT = 5000
 KEY = b'Sixteen byte key'
-IV = b'InitializationVe'
 
-def encryption(message):
-    cipher = Cipher(algorithms.AES(KEY), modes.CFB(IV), backend=default_backend())
+def encryption(message, iv):
+    cipher = Cipher(algorithms.AES(KEY), modes.CFB(iv), backend=default_backend())
     encryptor = cipher.encryptor()
-    return encryptor.update(message.encode('utf-8')) + encryptor.finalize()
+    return iv + encryptor.update(message.encode('utf-8')) + encryptor.finalize()
 
 def decryption(ciphertext):
-    cipher = Cipher(algorithms.AES(KEY), modes.CFB(IV), backend=default_backend())
+    iv = ciphertext[:16]  # Extract the IV (first 16 bytes)
+    cipher = Cipher(algorithms.AES(KEY), modes.CFB(iv), backend=default_backend())
     decryptor = cipher.decryptor()
-    return decryptor.update(ciphertext) + decryptor.finalize()
+    return decryptor.update(ciphertext[16:]) + decryptor.finalize()
 
 def log_to_file(data, direction):
     timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     log_entry = f"[{timestamp}] {direction}: {data}\n"
 
-    with open('encryption_log_server.txt', 'a') as log_file:
+    with open('encryption_log.txt', 'a') as log_file:
         log_file.write(log_entry)
 
 def chat(client_socket):
@@ -47,11 +48,14 @@ def chat(client_socket):
             print("Client requested to quit. Exiting.")
             break
 
+        # Generate a new IV for the next message
+        new_iv = os.urandom(16)
+
         # Get user input and encrypt the message
         response = input("Enter your response: ")
         if not response:
             response = ' '
-        encrypted_response = encryption(response)
+        encrypted_response = encryption(response, new_iv)
         
         # Log sent encrypted data
         log_to_file(encrypted_response.hex(), "Sent")

@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 
 import socket
+import os
+import datetime
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
@@ -8,17 +10,17 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 IP = '127.0.0.1'
 PORT = 5000
 KEY = b'Sixteen byte key'
-IV = b'InitializationVe'
 
-def encryption(message):
-    cipher = Cipher(algorithms.AES(KEY), modes.CFB(IV), backend=default_backend())
+def encryption(message, iv):
+    cipher = Cipher(algorithms.AES(KEY), modes.CFB(iv), backend=default_backend())
     encryptor = cipher.encryptor()
-    return encryptor.update(message.encode('utf-8')) + encryptor.finalize()
+    return iv + encryptor.update(message.encode('utf-8')) + encryptor.finalize()
 
 def decryption(ciphertext):
-    cipher = Cipher(algorithms.AES(KEY), modes.CFB(IV), backend=default_backend())
+    iv = ciphertext[:16]  # Extract the IV (first 16 bytes)
+    cipher = Cipher(algorithms.AES(KEY), modes.CFB(iv), backend=default_backend())
     decryptor = cipher.decryptor()
-    return decryptor.update(ciphertext) + decryptor.finalize()
+    return decryptor.update(ciphertext[16:]) + decryptor.finalize()
 
 def chat(client_socket):
     while True:
@@ -26,7 +28,8 @@ def chat(client_socket):
         message = input("Enter your message: ")
         if not message:
             message = ' '
-        encrypted_message = encryption(message)
+        iv = os.urandom(16)  # Generate a new IV for each message
+        encrypted_message = encryption(message, iv)
         client_socket.send(encrypted_message)
 
         # Check for the exit command
@@ -39,6 +42,9 @@ def chat(client_socket):
         if not encrypted_response:
             break
 
+        # Log received encrypted data
+        log_to_file(encrypted_response.hex(), "Received")
+
         # Decrypt the received response
         response = decryption(encrypted_response).decode('utf-8')
         print(f"Server response: {response}")
@@ -47,6 +53,13 @@ def chat(client_socket):
         if '\\quit' in response.lower():
             print("Server requested to quit. Exiting.")
             break
+
+def log_to_file(data, direction):
+    timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    log_entry = f"[{timestamp}] {direction}: {data}\n"
+
+    with open('encryption_log_server.txt', 'a') as log_file:
+        log_file.write(log_entry)
 
 def start_client():
     # Create a socket object
